@@ -1,82 +1,58 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useCallback } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+  selectFavorites,
+  toggleFavorite,
+  clearFavorites,
+  selectIsFavorite,
+} from '@/redux/favoritesSlice';
 
-const STORAGE_KEY = 'cinestream_favorites';
-
+/**
+ * Legacy Context Adapter
+ *
+ * Fully backed by Redux Toolkit (RTK) global state.
+ * Eliminates custom Context state and localStorage synchronization boilerplate
+ * while maintaining 100% backward-compatibility for any existing consumer.
+ */
 const FavoritesContext = createContext(null);
 
 export function FavoritesProvider({ children }) {
-  const [favorites, setFavorites] = useState([]);
-  const [isHydrated, setIsHydrated] = useState(false);
-
-  // Safely read from localStorage only on client after mount (prevents SSR hydration mismatch)
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setFavorites(JSON.parse(stored));
-      }
-    } catch (err) {
-      console.error('Failed to parse favorites from localStorage:', err);
-    } finally {
-      setIsHydrated(true);
-    }
-  }, []);
-
-  // Persist to localStorage whenever favorites change after initial mount
-  useEffect(() => {
-    if (!isHydrated) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(favorites));
-    } catch (err) {
-      console.error('Failed to persist favorites to localStorage:', err);
-    }
-  }, [favorites, isHydrated]);
-
-  const toggleFavorite = (movie) => {
-    if (!movie || !movie.id) return;
-    setFavorites((prev) => {
-      const exists = prev.some((item) => String(item.id) === String(movie.id));
-      if (exists) {
-        return prev.filter((item) => String(item.id) !== String(movie.id));
-      } else {
-        return [movie, ...prev];
-      }
-    });
-  };
-
-  const isFavorite = (movieId) => {
-    if (!movieId) return false;
-    return favorites.some((item) => String(item.id) === String(movieId));
-  };
-
-  const clearFavorites = () => {
-    setFavorites([]);
-  };
-
-  const value = {
-    favorites,
-    toggleFavorite,
-    isFavorite,
-    clearFavorites,
-    isHydrated,
-  };
-
-  return (
-    <FavoritesContext.Provider value={value}>
-      {children}
-    </FavoritesContext.Provider>
-  );
+  // Pass-through wrapper: ReduxProvider handles store and persistence
+  return <>{children}</>;
 }
 
 export function useFavorites() {
-  const context = useContext(FavoritesContext);
-  if (!context) {
-    throw new Error('useFavorites must be used within a FavoritesProvider');
-  }
-  return context;
+  const dispatch = useDispatch();
+  const favorites = useSelector(selectFavorites);
+
+  const handleToggle = useCallback(
+    (movie) => {
+      dispatch(toggleFavorite(movie));
+    },
+    [dispatch]
+  );
+
+  const handleClear = useCallback(() => {
+    dispatch(clearFavorites());
+  }, [dispatch]);
+
+  const checkIsFavorite = useCallback(
+    (movieId) => {
+      if (!movieId) return false;
+      return favorites.some((item) => String(item.id) === String(movieId));
+    },
+    [favorites]
+  );
+
+  return {
+    favorites,
+    toggleFavorite: handleToggle,
+    clearFavorites: handleClear,
+    isFavorite: checkIsFavorite,
+    isHydrated: true,
+  };
 }
 
 export default FavoritesContext;

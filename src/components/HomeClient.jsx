@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { SearchBar } from '@/components/SearchBar';
 import { MoodMatcher } from '@/components/MoodMatcher';
 import { MovieCard } from '@/components/MovieCard';
+import { MovieGrid } from '@/components/MovieGrid';
 import { MovieModal } from '@/components/MovieModal';
 import { useDebounce } from '@/hooks/useDebounce';
 import { fetchPopularMovies, searchMovies, getPosterUrl } from '@/services/movieService';
@@ -346,35 +347,15 @@ export default function HomeClient({ initialMovies, initialProvider, initialTota
           </div>
         )}
 
-        {/* Loading Skeleton: Exact CSS Grid shape */}
-        {loading && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 p-6">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <div
-                key={i}
-                className="aspect-[2/3] w-full rounded-lg overflow-hidden bg-gray-900 animate-pulse"
-              >
-                <div className="w-full h-full bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900" />
-              </div>
-            ))}
-          </div>
-        )}
+        {/* ── Connected Redux Movie Grid with Real-time Filtering ─────────── */}
+        <MovieGrid
+          movies={movies}
+          onSelectMovie={(m) => setSelectedMovie(m)}
+          loading={loading}
+          error={error}
+        />
 
-        {/* Movie Grid: Responsive CSS Grid */}
-        {!loading && movies.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 p-6">
-            {movies.map((movie) => (
-              <MovieCard
-                key={movie.id}
-                movie={movie}
-                onSelectMovie={(m) => setSelectedMovie(m)}
-                enableLink={false}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Zero Results */}
+        {/* Zero Results from API Search */}
         {!loading && movies.length === 0 && !error && (
           <div className="py-20 text-center flex flex-col items-center justify-center">
             <Film className="w-16 h-16 text-slate-600 mb-4" />

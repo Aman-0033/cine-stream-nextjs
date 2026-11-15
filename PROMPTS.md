@@ -212,3 +212,73 @@ Architect a premium, cinematic streaming interface for "Cine-Stream" comparable 
 5. `src/components/HomeClient.jsx`: Upgraded with cinematic trending hero banner and responsive grid layout.
 
 ---
+
+# Cine-Stream (Sprint 10 — "The Data Storm": Global State Architecture & Performance)
+## Principal Frontend Architecture & Engineering Log
+
+### Overview & Core Objectives
+Sprint 10 ("The Data Storm") modernizes Cine-Stream's client state layer by implementing Redux Toolkit (RTK) and Redux-Persist. This replaces the legacy React Context API (`FavoritesContext`), introduces cross-cutting multi-parameter filtering, adds a dynamic theme manager, and enforces strict React rendering optimizations.
+
+---
+
+### Phase 1: Global Store Initialization & Persistence
+
+#### 1. Architectural Strategy & Dependencies
+- Installed `@reduxjs/toolkit` (modern Redux core with `createSlice` and Immer), `react-redux` (React bindings), and `redux-persist` (client-side state persistence).
+- **SSR-Safe Storage Adapter**: Next.js App Router pre-renders components in Node.js where `window` and `localStorage` are undefined. Directly accessing `localStorage` causes build-time and SSR runtime crashes. We implemented a fallback `createNoopStorage` adapter returning resolved promises during SSR and delegating to `window.localStorage` on the client.
+- **Serialization Middleware**: RTK warns when non-serializable values pass through actions. Redux-Persist lifecycle actions (`FLUSH`, `REHYDRATE`, `PAUSE`, `PERSIST`, `PURGE`, `REGISTER`) carry function handlers. We whitelisted these actions in `getDefaultMiddleware({ serializableCheck: { ignoredActions: [...] } })`.
+
+#### 2. App Router Client Boundary (`ReduxProvider.js`)
+- **Server Component Rule**: React Context and Redux Store listeners depend on client hooks (`useSyncExternalStore`), which cannot run in Server Components.
+- Placing `<Provider>` directly in `app/layout.js` causes Next.js runtime errors (`createContext is not a function`).
+- **Architectural Solution**: Encapsulated `<Provider>` and `<PersistGate>` inside a dedicated Client Component (`ReduxProvider.js`) with `"use client";`. Because Server Components can be passed as `children` into Client Components, `app/layout.js` remains an async Server Component with server metadata and streaming SSR intact.
+
+#### 3. Favorites Slice (`favoritesSlice.js`)
+- Manages user liked movies with atomic actions: `toggleFavorite`, `addFavorite`, `removeFavorite`, `clearFavorites`.
+- Selectors: `selectFavorites`, `selectFavoritesCount`, `selectIsFavorite(id)`.
+- Whitelisted in `persistConfig` for persistent cross-session retention in browser `localStorage`.
+
+---
+
+### Phase 2: Complex Filtering & State Sync
+
+#### 1. Filter Slice (`filterSlice.js`)
+- Manages active parameters:
+  - `genre`: TMDB numeric genre ID or `'ALL'`.
+  - `minRating`: Float rating boundary (0.0 to 9.0).
+  - `releaseYear`: Specific release year (`'2024'`, `'2023'`, etc.) or era (`'2010s'`, `'2000s'`).
+  - `sortBy`: Order criterion (`'default'`, `'rating-desc'`, `'year-desc'`, `'title-asc'`).
+- Reducers: `setGenre`, `setMinRating`, `setReleaseYear`, `setSortBy`, and `resetFilters`.
+- Intentionally excluded from `persistConfig.whitelist` so filter queries reset cleanly on new browser visits.
+
+#### 2. Sidebar Filter Component (`SidebarFilter.jsx`)
+- Interactive desktop filter panel integrated into `<aside>` under `<SidebarNav />`.
+- Features TMDB Genre dropdown, live Star rating slider with reactive badges (`★ 7.5+`), Year selector, and Sort By options.
+- Dynamic Reset button surfaces with an active counter badge whenever filters diverge from default.
+
+#### 3. Connected Movie Grid (`MovieGrid.jsx`)
+- Intercepts raw TMDB & OMDb movie payloads.
+- Dynamically filters the list in real-time according to Redux state:
+  - Matches TMDB `genre_ids`, detailed `genres` arrays, and OMDb `Genre` strings.
+  - Matches numeric ratings across `vote_average` and `imdbRating`.
+  - Matches 4-digit release dates and decade boundaries.
+- Displays active filter summary pills with a single-click "Clear Filters" button and an intuitive zero-match empty state.
+
+---
+
+### Phase 3: Render Optimization & Theming
+
+#### 1. Dynamic Theming Engine (`themeSlice.js`)
+- Manages `mode: 'dark' | 'light'`, default to Cine-Stream's signature Dark Mode.
+- Persisted in `localStorage` via Redux-Persist.
+- **Theme Synchronization (`ThemeEffect`)**: Automatically synchronizes the root `<html>` element class (`dark` vs `light`) and `data-theme` attribute upon store rehydration.
+- **Semantic CSS Tokens (`globals.css`)**: Defined CSS variables (`--bg-primary`, `--bg-surface`, `--bg-sidebar`, `--border-primary`, `--text-primary`) that transition background colors from Jet Black (`#0A0A0A`) to Soft Slate (`#F8FAFC`).
+- **Interactive Theme Toggle (`ThemeToggle.jsx`)**: Added to `TopNavbar.jsx` with Sun/Moon iconography and fluid micro-interactions.
+
+#### 2. Render Optimization Audit (High Frame-Rate Guarantee)
+- **`useMemo` Array Computations**: Multi-dimensional filtering across TMDB payloads is wrapped in `useMemo` to eliminate expensive CPU work during unrelated renders.
+- **`useCallback` Dispatchers**: Mutation dispatchers across `SidebarFilter`, `MovieGrid`, `MovieCard`, and `ThemeToggle` are wrapped in `useCallback` to guarantee referential stability.
+- **`React.memo` Component Isolation**: `MovieGrid`, `SidebarFilter`, `MovieCard`, and `SidebarNav` are wrapped in `React.memo` to eliminate component re-renders when parent states change.
+- **Fine-Grained Selectors**: Components subscribe to specific primitive slices of state rather than the monolithic state tree, minimizing dispatch re-evaluation overhead.
+- **Zero Hydro Mismatch**: Added `suppressHydrationWarning` on `<html>` and ensured theme classes synchronize cleanly post-mount.
+

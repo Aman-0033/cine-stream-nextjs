@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Search, Radio, Wifi, ShieldCheck } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { setProviderMode, getProviderMode, setProviderListener } from '@/services/movieService';
 
 export function TopNavbar() {
@@ -79,12 +80,14 @@ export function TopNavbar() {
         />
       </form>
 
-      {/* ── Right: 'ISP Fallback (OMDb API)' Button ────────────────────────── */}
-      <div className="flex items-center shrink-0 relative">
+      {/* ── Right: Theme Toggle & 'ISP Fallback' Button ──────────────────── */}
+      <div className="flex items-center space-x-2.5 shrink-0 relative">
+        <ThemeToggle />
+
         <button
           type="button"
           onClick={() => setShowNetworkInfo(!showNetworkInfo)}
-          className="flex items-center space-x-2 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-medium bg-gray-900 border border-gray-800 text-slate-300 hover:text-white hover:border-[#FF2D95] transition-all shadow-sm"
+          className="flex items-center space-x-2 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-medium bg-gray-900 dark:bg-gray-900 border border-gray-800 dark:border-gray-800 text-slate-300 hover:text-white hover:border-[#FF2D95] transition-all shadow-sm cursor-pointer"
           title="ISP Fallback status & diagnostics"
         >
           <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
